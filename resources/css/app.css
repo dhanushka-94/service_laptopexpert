@@ -1,3 +1,11 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Custom button styles to override Tailwind preflight */
+@layer components {
+    .btn {
+        background-image: none !important;
+        background-color: var(--tw-bg-opacity) !important;
+    }
+}

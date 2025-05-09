@@ -8,12 +8,116 @@
                 <a href="{{ route('jobs.edit', $job) }}" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm">Edit Job</a>
                 <a href="{{ route('jobs.print', $job) }}" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md text-sm" target="_blank">Print Receipt</a>
                 <a href="{{ route('jobs.pdf', $job) }}" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-md text-sm" target="_blank">Generate PDF</a>
+                <button id="shareButton" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-md text-sm">Share Link</button>
+                <button id="smsButton" class="btn bg-teal-500 !bg-teal-500 hover:bg-teal-600 text-white px-4 py-2 rounded-md text-sm">Send SMS</button>
             </div>
         </div>
     </x-slot>
 
+    <!-- Share Link Modal -->
+    <div id="shareModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white p-6 rounded-lg shadow-lg w-full mx-4 sm:mx-auto sm:max-w-lg md:max-w-xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-medium">Share Job Details</h3>
+                <button id="closeShareModal" class="text-gray-500 hover:text-gray-700">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="mb-4">
+                <p class="text-sm text-gray-600 mb-2">Share this link with the customer to view job details:</p>
+                <div class="flex">
+                    <input id="shareLink" type="text" class="flex-1 border-gray-300 rounded-l-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" readonly>
+                    <button id="copyButton" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-r-md text-sm">Copy</button>
+                </div>
+                <p id="copyMessage" class="text-green-600 text-sm mt-1 hidden">Link copied!</p>
+            </div>
+            <div class="border-t border-gray-200 pt-4">
+                <h4 class="font-medium text-sm mb-2">Share via:</h4>
+                <div class="flex space-x-2">
+                    <a id="whatsappShare" href="#" target="_blank" class="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md text-sm text-center">
+                        WhatsApp
+                    </a>
+                    <a id="emailShare" href="#" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm text-center">
+                        Email
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- SMS Modal -->
+    <div id="smsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white p-6 rounded-lg shadow-lg w-full mx-4 sm:mx-auto sm:max-w-lg md:max-w-xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-medium">Send Job Update via SMS</h3>
+                <button id="closeSmsModal" class="text-gray-500 hover:text-gray-700">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            
+            <form action="{{ route('jobs.send-sms', $job) }}" method="POST">
+                @csrf
+                <div class="mb-4">
+                    <label for="phone_number" class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                    <input type="text" name="phone_number" id="phone_number" 
+                           value="{{ $job->customer->phone_1 ?? '' }}" 
+                           class="w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                    <p class="text-xs text-gray-500 mt-1">Enter phone number in international format (9471XXXXXXX)</p>
+                </div>
+                
+                <div class="mb-4">
+                    <p class="text-sm font-medium text-gray-700 mb-1">Message Preview</p>
+                    <div class="p-3 bg-gray-50 rounded-md text-gray-800 text-sm">
+                        <p>Job #{{ $job->job_id }} Status: {{ $job->status }}</p>
+                        <p>{{ $job->device_type }} {{ $job->brand }} {{ $job->model }}</p>
+                        @if($job->notes->count() > 0)
+                            <p>Latest update: {{ Str::limit($job->notes->first()->note, 50) }}</p>
+                        @endif
+                        @if($job->final_cost)
+                            <p>Cost: LKR {{ number_format($job->final_cost, 2) }}</p>
+                        @endif
+                        <p>Thank you for choosing Laptop Experts Service Center.</p>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">The actual SMS will include a shareable link.</p>
+                </div>
+                
+                <div class="flex justify-end">
+                    <button type="button" id="cancelSmsBtn" class="text-gray-600 hover:text-gray-900 mr-2">Cancel</button>
+                    <button type="submit" class="btn bg-teal-500 !bg-teal-500 hover:bg-teal-600 text-white px-4 py-2 rounded-md text-sm">Send SMS</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            <!-- Flash Messages -->
+            @if(session('success'))
+                <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6" role="alert">
+                    <p>{{ session('success') }}</p>
+                </div>
+            @endif
+            
+            @if(session('error'))
+                <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6" role="alert">
+                    <p>{{ session('error') }}</p>
+                </div>
+            @endif
+            
+            @if($errors->any())
+                <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6" role="alert">
+                    <ul>
+                        @foreach($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+            
             <!-- Job Summary -->
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
                 <div class="p-6 bg-white border-b border-gray-200">
@@ -51,6 +155,21 @@
                                     </select>
                                     <button type="submit" class="bg-gray-800 text-white rounded-r-md px-3 py-0 text-sm">Update</button>
                                 </div>
+                                @if($job->customer->phone_1)
+                                    <span class="inline-flex items-center mt-2 text-xs text-gray-600">
+                                        <svg class="w-4 h-4 mr-1 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                        </svg>
+                                        Status updates will be sent via SMS to {{ $job->customer->phone_1 }}
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center mt-2 text-xs text-yellow-600">
+                                        <svg class="w-4 h-4 mr-1 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                        </svg>
+                                        No phone number available to send status updates
+                                    </span>
+                                @endif
                             </form>
                         </div>
                     </div>
@@ -232,20 +351,90 @@
     </div>
     
     <script>
-        // Simple JavaScript to toggle the note form
         document.addEventListener('DOMContentLoaded', function() {
-            const addNoteBtn = document.getElementById('addNoteBtn');
-            const addNoteForm = document.getElementById('addNoteForm');
-            const cancelNoteBtn = document.getElementById('cancelNoteBtn');
+            // Share Link Modal
+            const shareButton = document.getElementById('shareButton');
+            const shareModal = document.getElementById('shareModal');
+            const closeShareModal = document.getElementById('closeShareModal');
+            const shareLinkInput = document.getElementById('shareLink');
+            const copyButton = document.getElementById('copyButton');
+            const copyMessage = document.getElementById('copyMessage');
+            const whatsappShare = document.getElementById('whatsappShare');
+            const emailShare = document.getElementById('emailShare');
             
-            addNoteBtn.addEventListener('click', function() {
-                addNoteForm.classList.remove('hidden');
-                addNoteBtn.classList.add('hidden');
+            // SMS Modal
+            const smsButton = document.getElementById('smsButton');
+            const smsModal = document.getElementById('smsModal');
+            const closeSmsModal = document.getElementById('closeSmsModal');
+            const cancelSmsBtn = document.getElementById('cancelSmsBtn');
+            
+            // Show share modal when share button is clicked
+            shareButton.addEventListener('click', function() {
+                // Generate link via AJAX
+                fetch('{{ route('jobs.generate-link', $job) }}')
+                    .then(response => response.json())
+                    .then(data => {
+                        shareLinkInput.value = data.url;
+                        
+                        // Update share buttons
+                        whatsappShare.href = `https://wa.me/?text=View your laptop service job details: ${encodeURIComponent(data.url)}`;
+                        
+                        const emailSubject = 'Your Laptop Service Job Details';
+                        const emailBody = `Hello,\n\nYou can view your laptop service job details here: ${data.url}\n\nRegards,\nLaptop Experts Service Center`;
+                        emailShare.href = `mailto:${encodeURIComponent('{{ $job->customer->email }}')}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+                        
+                        // Show modal
+                        shareModal.classList.remove('hidden');
+                    })
+                    .catch(error => {
+                        console.error('Error generating share link:', error);
+                    });
             });
             
-            cancelNoteBtn.addEventListener('click', function() {
-                addNoteForm.classList.add('hidden');
-                addNoteBtn.classList.remove('hidden');
+            // Close share modal
+            closeShareModal.addEventListener('click', function() {
+                shareModal.classList.add('hidden');
+                copyMessage.classList.add('hidden');
+            });
+            
+            // Close share modal when clicking outside
+            shareModal.addEventListener('click', function(e) {
+                if (e.target === shareModal) {
+                    shareModal.classList.add('hidden');
+                    copyMessage.classList.add('hidden');
+                }
+            });
+            
+            // Copy link to clipboard
+            copyButton.addEventListener('click', function() {
+                shareLinkInput.select();
+                document.execCommand('copy');
+                
+                copyMessage.classList.remove('hidden');
+                setTimeout(function() {
+                    copyMessage.classList.add('hidden');
+                }, 3000);
+            });
+            
+            // Show SMS modal
+            smsButton.addEventListener('click', function() {
+                smsModal.classList.remove('hidden');
+            });
+            
+            // Close SMS modal
+            closeSmsModal.addEventListener('click', function() {
+                smsModal.classList.add('hidden');
+            });
+            
+            cancelSmsBtn.addEventListener('click', function() {
+                smsModal.classList.add('hidden');
+            });
+            
+            // Close SMS modal when clicking outside
+            smsModal.addEventListener('click', function(e) {
+                if (e.target === smsModal) {
+                    smsModal.classList.add('hidden');
+                }
             });
         });
     </script>

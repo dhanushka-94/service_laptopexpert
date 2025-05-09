@@ -6,6 +6,9 @@ use App\Http\Controllers\JobNoteController;
 use App\Http\Controllers\PDFController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ServiceJobController;
+use App\Http\Controllers\ShareableController;
+use App\Http\Controllers\SMSController;
+use App\Http\Controllers\SmsLogController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -22,6 +25,10 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return redirect()->route('login');
 });
+
+// Public shareable routes
+Route::get('/share/{token}', [ShareableController::class, 'viewSharedJob'])->name('share.job');
+Route::get('/share/{token}/pdf', [ShareableController::class, 'downloadSharedJobPDF'])->name('share.job.pdf');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     // Dashboard
@@ -43,6 +50,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/jobs/{job}/pdf/download', [PDFController::class, 'downloadJobPDF'])->name('jobs.pdf.download');
     Route::get('/jobs/{job}/print', [PDFController::class, 'printJobReceipt'])->name('jobs.print');
     Route::get('/reports/service', [PDFController::class, 'generateServiceReport'])->name('reports.service');
+    
+    // Shareable Links
+    Route::get('/jobs/{job}/generate-link', [ShareableController::class, 'generateLink'])->name('jobs.generate-link');
+    
+    // SMS Notifications
+    Route::post('/jobs/{job}/send-sms', [SMSController::class, 'sendJobNoteSMS'])->name('jobs.send-sms');
+    
+    // SMS Logs
+    Route::get('/sms-logs', [SmsLogController::class, 'index'])->name('sms-logs.index');
+    Route::get('/sms-logs/{smsLog}', [SmsLogController::class, 'show'])->name('sms-logs.show');
+    Route::post('/sms-logs/{smsLog}/resend', [SmsLogController::class, 'resend'])->name('sms-logs.resend');
 });
 
 Route::middleware('auth')->group(function () {

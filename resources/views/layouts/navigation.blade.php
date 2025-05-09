@@ -23,6 +23,10 @@
                     <x-nav-link :href="route('jobs.index')" :active="request()->routeIs('jobs.*')">
                         {{ __('Service Jobs') }}
                     </x-nav-link>
+                    
+                    <x-nav-link :href="route('sms-logs.index')" :active="request()->routeIs('sms-logs.*')">
+                        {{ __('SMS Logs') }}
+                    </x-nav-link>
                 </div>
             </div>
 
@@ -85,6 +89,10 @@
             
             <x-responsive-nav-link :href="route('jobs.index')" :active="request()->routeIs('jobs.*')">
                 {{ __('Service Jobs') }}
+            </x-responsive-nav-link>
+            
+            <x-responsive-nav-link :href="route('sms-logs.index')" :active="request()->routeIs('sms-logs.*')">
+                {{ __('SMS Logs') }}
             </x-responsive-nav-link>
         </div>
 

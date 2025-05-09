@@ -6,10 +6,22 @@ use App\Http\Requests\ServiceJobRequest;
 use App\Models\Customer;
 use App\Models\ServiceJob;
 use App\Models\User;
+use App\Services\SMSService;
+use App\Http\Controllers\ShareableController;
 use Illuminate\Http\Request;
 
 class ServiceJobController extends Controller
 {
+    protected $smsService;
+
+    /**
+     * Create a new controller instance.
+     */
+    public function __construct(SMSService $smsService)
+    {
+        $this->smsService = $smsService;
+    }
+
     /**
      * Display a listing of the resource.
      */
@@ -72,6 +84,9 @@ class ServiceJobController extends Controller
     {
         $job = ServiceJob::create($request->validated());
         
+        // Send SMS notification about new job
+        $this->sendStatusUpdateSMS($job);
+        
         if ($request->has('print_receipt')) {
             return redirect()->route('jobs.print', $job);
         }
@@ -133,9 +148,83 @@ class ServiceJobController extends Controller
             'status' => 'required|in:Pending,In Progress,Awaiting Parts,Repaired,Delivered,Canceled',
         ]);
         
-        $job->update(['status' => $request->status]);
+        $oldStatus = $job->status;
+        $newStatus = $request->status;
+        
+        // Update the job status
+        $job->update(['status' => $newStatus]);
+        
+        // If status has changed, send SMS notification
+        if ($oldStatus !== $newStatus) {
+            $this->sendStatusUpdateSMS($job);
+        }
         
         return redirect()->back()->with('success', 'Job status updated successfully.');
+    }
+    
+    /**
+     * Send SMS notification about status update to customer.
+     */
+    private function sendStatusUpdateSMS(ServiceJob $job)
+    {
+        // Load related data
+        $job->load(['customer', 'technician', 'notes' => function($query) {
+            $query->where('is_private', false)->latest();
+        }]);
+        
+        // Check if customer has a phone number
+        if (empty($job->customer->phone_1)) {
+            return;
+        }
+        
+        // Prepare the message
+        $message = "Status Update: Job #" . $job->job_id . " is now " . $job->status . "\n";
+        
+        // Add device info
+        $message .= $job->device_type;
+        if ($job->brand) $message .= " " . $job->brand;
+        if ($job->model) $message .= " " . $job->model;
+        $message .= "\n";
+        
+        // Add latest note if available
+        if ($job->notes->count() > 0) {
+            $message .= "Latest update: " . $job->notes->first()->note . "\n";
+        }
+        
+        if ($job->final_cost) {
+            $message .= "Cost: LKR " . number_format($job->final_cost, 2) . "\n";
+        }
+        
+        // Add shareable link if available
+        if ($job->shareableToken) {
+            $message .= "View details: " . url('/share/' . $job->shareableToken->token) . "\n";
+        } else {
+            // Generate a token first
+            $shareableController = app(ShareableController::class);
+            $response = $shareableController->generateLink($job);
+            $data = json_decode($response->getContent(), true);
+            if (isset($data['url'])) {
+                $message .= "View details: " . $data['url'] . "\n";
+            }
+        }
+        
+        // Add footer
+        $message .= "Thank you for choosing Laptop Experts Service Center.";
+        
+        // Send the SMS
+        $phoneNumber = $job->customer->phone_1;
+        $contactDetails = [
+            'first_name' => $job->customer->name,
+            'email' => $job->customer->email,
+        ];
+        
+        $options = [
+            'service_job_id' => $job->id,
+            'customer_id' => $job->customer_id,
+            'type' => 'status_update',
+        ];
+        
+        $this->smsService->send($phoneNumber, $message, $contactDetails, $options);
     }
     
     /**

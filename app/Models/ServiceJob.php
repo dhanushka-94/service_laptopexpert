@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ServiceJob extends Model
 {
@@ -67,7 +68,15 @@ class ServiceJob extends Model
      */
     public function notes(): HasMany
     {
-        return $this->hasMany(JobNote::class);
+        return $this->hasMany(JobNote::class, 'service_job_id');
+    }
+
+    /**
+     * Get the shareable token for the job.
+     */
+    public function shareableToken(): HasOne
+    {
+        return $this->hasOne(ShareableToken::class);
     }
 
     /**
